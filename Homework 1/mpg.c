@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 				{
 					err(errmsg);
 				}
-				//printf("the number of requests is: %d\n", nrequests); // test
+				//printf("the number in nrequests is: %d\n", nrequests); // test
 				break;
 
 			case 'm': // if 'm' character found then

@@ -40,8 +40,8 @@ char get_char_from_str(char* str, int pos)
 		fprintf(stderr, "get_char_from_str: desired position exceeds length of str\n");
 		exit(1);
 	}
-
-	for(int i=0; i<pos; i++)
+	int i;
+	for(i=0; i<pos; i++)
 	{
 		*++str;
 	}
