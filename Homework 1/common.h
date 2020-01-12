@@ -15,5 +15,6 @@
 
 // functions prototypes
 char get_char_from_str(char* str, int pos);
+void err(char* errmsg);
 
 #endif
