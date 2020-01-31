@@ -17,7 +17,8 @@ int main(int argc, char *argv[])
 	int in_src = DEFAULT; // input source flag
 	int out_src = DEFAULT; // output source flag
 	int blocks = 10; // number of characters in a block
-	char* mask = (char*) calloc(20, sizeof(char)); // allocate memory for mask string
+	char* block_str = "10"; // block as a string
+	char* mask = (char*) calloc(15, sizeof(char)); // allocate memory for mask string
 	strcpy(mask, "\0"); // initialize mask with end character
 	
 	// Values needed in the flag-updating section of the program
@@ -61,7 +62,7 @@ int main(int argc, char *argv[])
 					++argcpos;
 					if(argcpos >= argc)
 					{
-						err("ERROR twist: no input for argument\n");
+						err("ERROR tx: no input for argument\n");
 					}
 					i_filename = argv[++argvpos];
 					//printf("input source flag updated\n"); // test
@@ -84,7 +85,7 @@ int main(int argc, char *argv[])
 					++argcpos;
 					if(argcpos >= argc)
 					{
-						err("ERROR twist: no input for argument\n");
+						err("ERROR tx: no input for argument\n");
 					}
 					o_filename = argv[++argvpos];
 					//printf("output source flag updated\n"); // test
@@ -103,9 +104,10 @@ int main(int argc, char *argv[])
 					++argcpos;
 					if(argcpos >= argc)
 					{
-						err("ERROR twist: no input for argument\n");
+						err("ERROR tx: no input for argument\n");
 					}
 					blocks = atoi(argv[++argvpos]); // store <num> int in blocks flag
+					block_str = strdup(argv[argvpos]); // store the <num> as a string
 					
 					
 					// exit the program with an error message if not a valid number
@@ -120,7 +122,20 @@ int main(int argc, char *argv[])
 					break;
 				
 				default:
-					err(errmsg);
+					// should also set the mask
+					// check if the mask flag has already been updated
+					if(m_updated > 0)
+					{
+						++argcpos; // to keep the string count on track
+						break; // if so, don't update again
+					}
+			
+					// a mask will be made from this input
+					mask = argv[argvpos];
+					++m_updated; // set the flag to not update the mask variable again
+					//printf("the mask is: %s\n", mask); // test
+					//printf("string length is: %d\n", strlen(mask)); // test
+					
 					break;
 					
 			}
@@ -144,6 +159,12 @@ int main(int argc, char *argv[])
 		}
 		++argcpos;
 		
+	} // end while
+	
+	// check to see if the mask was updated, error if not updated
+	if(m_updated == 0)
+	{
+		err("ERROR tx: mask must be provided\n");
 	}
 	
 ////////////////////////////////////////////////////////////////////////	
@@ -152,7 +173,7 @@ int main(int argc, char *argv[])
 
 	pid_t pid; // process ID
 	
-	printf("Parent program (pid:%d)\n", (int) getpid()); // test
+	//printf("Parent program (pid:%d)\n", (int) getpid()); // test
 	
 	int fd1[2];
 	
@@ -175,14 +196,23 @@ int main(int argc, char *argv[])
 		close(PIPE_RD);						// close the parent read
 		dup2(PIPE_WR, STDOUT_FILENO);			
 		
-		// pipes should be set up and ready at this point
-		
-		char* myargs[4];					// to input to the twist program
-		myargs[0] = strdup("./twist"); 		// program: twist
-		myargs[1] = strdup("-i"); 			// argument: input filename argument
-		myargs[2] = strdup(i_filename); 	// argument: input filename
-		myargs[3] = NULL; 					// end of the array
-		
+			// user entered an input filename
+			char* myargs[6];
+			myargs[0] = strdup("./twist");	// program: twist
+			myargs[1] = strdup("-b"); 		// argument: block size argument
+			myargs[2] = strdup(block_str); // argument: block size
+			myargs[3] = strdup("-i");		// argument: input filename argument
+			myargs[4] = strdup(i_filename);	// argument: input filename
+			myargs[5] = NULL; 				// end of the array
+			
+		// if user did not enter in an input filename
+		if(in_src == DEFAULT)
+		{
+			// update myargs to exclude input file flag
+			myargs[3] = NULL;
+			myargs[4] = NULL;
+		}
+				
 		// open the twist program
 		
 		int code = execvp(myargs[0], myargs); // run the twist program
@@ -191,7 +221,7 @@ int main(int argc, char *argv[])
 			err("ERROR tx: unable to execute program\n");
 		}
 		
-		printf("This is the parent program\n"); // test
+		//printf("This is the parent program\n"); // test
 	
 	}
 	
@@ -204,11 +234,22 @@ int main(int argc, char *argv[])
 		
 		// pipes should be set up and ready at this point
 		
-		char* myargs[4]; 					// to input to the xor program
-		myargs[0] = strdup("./twist");		// program: xor
-		myargs[1] = strdup("-o");			// argument: output filename argument
-		myargs[2] = strdup(o_filename);		// argument: output filename
-		myargs[3] = NULL;
+		// pass arguments to the program that were defined in beginning
+		
+		char* myargs[5]; 					// to input to the xor program
+		myargs[0] = strdup("./xor");		// program: xor
+		myargs[1] = strdup(mask);			// argument: mask
+		myargs[2] = strdup("-o");			// argument: output filename argument
+		myargs[3] = strdup(o_filename);		// argument: output filename
+		myargs[4] = NULL;
+		
+		// if user did not enter in an output filename
+		if(out_src == DEFAULT)
+		{
+			// update myargs to exclude input file flag
+			myargs[2] = NULL;
+			myargs[3] = NULL;
+		}
 		
 		// now should open the xor program
 		int code = execvp(myargs[0], myargs); // run the xor program
@@ -221,6 +262,8 @@ int main(int argc, char *argv[])
 		//printf("This is the child program\n"); // test
 	}
 	
+	free(mask); // free the calloc'ed space
+//*/
 	return 0;
 	
 }

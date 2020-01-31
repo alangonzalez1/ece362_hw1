@@ -1,23 +1,11 @@
-/*
- * twist.c - Twist the input and output it to a desired location
- * 
- * Author: Alan Gonzalez
- * ECE 362
- * 01/19/20
- * 
- * This is the source code file a program that will take in a
- * string of data from a desired source, twist it, and output it to a 
- * desired location
- *
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "common.h"
 #include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
+#include <unistd.h>
+#include "common.h"
+
 
 // constants
 #define DEFAULT 0
@@ -26,47 +14,65 @@
 int main(int argc, char *argv[])
 {
 	// Initialize the flags
-	int in_src = DEFAULT; // input source flag
-	int out_src = DEFAULT; // output source flag
-	int blocks = 10; // number of characters in a block
+	int in_src = DEFAULT; 							// input source flag
+	int out_src = DEFAULT; 							// output source flag
+	char* mask = (char*) calloc(20, sizeof(char)); 	// allocate memory for mask string
+	strcpy(mask, "\0"); 							// initialize mask with end character
 	
 	// Values needed in the flag-updating section of the program
-	int argvpos = 0; // start at argv[0]
+	int argvpos = 0; 								// start at argv[0]
 	int argcpos = 1; 
-	char* i_filename = "0"; // storage place for the name of the input file
-	char* o_filename = "0"; // storage place for the name of the output file
+	char* i_filename = "0"; 						// storage place for the name of the input file
+	char* o_filename = "0"; 						// storage place for the name of the output file
+	
+	int m_updated = 0; // used to check if mask was already updated
 	
 ////////////////////////////////////////////////////////////////////////	
 //////////// update flags based on user-inputted arguments /////////////
 ////////////////////////////////////////////////////////////////////////
-
+	
 	while(argcpos < argc)
 	{
 		int char_pos = 0; // position of the character in the string
 		
-		// look for the "-" character
+		// go to the first character
 		char* temp = argv[++argvpos]; // start at argv[1]
 		
-		// go to the first character
+		// look for the "-" character
 		if(get_char_from_str(temp, char_pos) == '-')
 		{
-			// check next character 
+						// check next character 
 			switch(get_char_from_str(temp, char_pos+1))
 			{
 				case 'i': // the 'i' character was found
+					
+					// check if input source flag has already been updated
+					if(in_src > 0)
+					{
+						++argcpos; // to keep the count on track
+						break; // if so, don't update again
+					}
 					in_src = FILESRC; // update the input source flag
 					
 					// store the input filename string
 					++argcpos;
 					if(argcpos >= argc)
 					{
-						err("ERROR twist: no input for argument\n");
+						err("ERROR xor: no input for argument\n");
 					}
 					i_filename = argv[++argvpos];
 					
 					break;
 					
 				case 'o': // the 'o' character was found
+					
+					// check if output source flag has already been updated
+					if(out_src > 0)
+					{
+						++argcpos; // to keep the string count on track
+						break; // if so, don't update again
+					}
+					
 					// store the output filename string
 					out_src = FILESRC; // update the output source flag
 					
@@ -74,50 +80,57 @@ int main(int argc, char *argv[])
 					++argcpos;
 					if(argcpos >= argc)
 					{
-						err("ERROR twist: no input for argument\n");
+						err("ERROR xor: no input for argument\n");
 					}
 					o_filename = argv[++argvpos];
 					
 					break;
-					
-				case 'b': // the 'b' character was found
-					// update the blocks flag
-					++argcpos;
-					if(argcpos >= argc)
-					{
-						err("ERROR twist: no input for argument\n");
-					}
-					blocks = atoi(argv[++argvpos]); // store <num> int in blocks flag
-					
-					
-					// exit the program with an error message if not a valid number
-					if(blocks == 0)
-					{
-					err("ERROR twist: invalid input entered\n");
-					}
-					
-					break;
 				
-				default: // an invalid character or no character detected
-					err("ERROR twist: invalid input entered\n");
+				default:
+					// should also set the mask
+					// check if the mask flag has already been updated
+					if(m_updated > 0)
+					{
+						++argcpos; // to keep the string count on track
+						break; // if so, don't update again
+					}
+			
+					// a mask will be made from this input
+					mask = argv[argvpos];
+					++m_updated; // set the flag to not update the mask variable again
 					break;
 					
-			}
-		}
+			} // end switch
+		} // end if
 		
-		// the '-' character was not found	
 		else
 		{
-			err("ERROR twist: arguments are required to start with a '-' character\n");
-		}
+			// check if the mask flag has already been updated
+			if(m_updated > 0)
+					{
+						++argcpos; // to keep the string count on track
+						break; // if so, don't update again
+					}
+			
+			// a mask will be made from this input
+			mask = argv[argvpos];
+			++m_updated; // set the flag to not update the mask variable again
+			
+		} // end else
+		++argcpos;
 		
-		++argcpos;	
+	} // end while
+	
+	// check to see if the mask was updated, error if not updated
+	if(m_updated == 0 | strlen(mask) > 9)
+	{
+		err("ERROR xor: mask must be provided and be less than 10 characters\n");
 	}
-
+	
 ////////////////////////////////////////////////////////////////////////
 ////////////////// Load in data from desired source ////////////////////
 ////////////////////////////////////////////////////////////////////////
-
+	
 	char* buf = (char*) calloc(1024, sizeof(char)); // set aside 1Kb of char space
 	
 	// check the input source flag
@@ -135,25 +148,31 @@ int main(int argc, char *argv[])
 		}
 		
 		// at this point, safe to assume that we were able to open file
-		int size = read(fd, buf, 1024); // read from filename, store in buf	
+		int size = read(fd, buf, 1024); 			// read from filename, store in buf
 		
 		// cut the newline from the string if it has it
 		if(buf[strlen(buf) - 1] == '\n')
 			buf[strlen(buf) - 1] = '\0'; // trim the string to remove the newline character
-			
-		close(fd); // close the file
+
+		close(fd); 									// close the file
 		
 	}
 	
 	else
 	{
 		// load in data from stdin
-		int size = read(STDIN_FILENO, buf, 1024); // read from STDIN
+		int size = read(STDIN_FILENO, buf, 1024); 	// read from STDIN
 		
 		// cut the newline from the string if it has it
 		if(buf[strlen(buf) - 1] == '\n')
 			buf[strlen(buf) - 1] = '\0'; // trim the string to remove the newline character
 		
+	}
+
+	// error if size of the mask exceeds string length
+	if(strlen(mask) > strlen(buf))
+	{
+		err("ERROR xor: mask size cannot exceed number of characters in string\n");
 	}
 	
 ////////////////////////////////////////////////////////////////////////
@@ -161,53 +180,37 @@ int main(int argc, char *argv[])
 ////////////////////////////////////////////////////////////////////////
 	
 	// initialize the needed variables to modify the input
-	char* group = (char*) calloc(blocks, sizeof(char)); // for storing the block of characters taken from buf
-	char* mod_group = (char*) calloc(blocks, sizeof(char)); // for storing the twisted block of characters
-	int i; // used in the for loop
-	char* result = (char*) calloc(1024, sizeof(char)); // to store the result
-	int bk = blocks; // copy blocks variable to change it
-	int counter = 0; // to keep track of how many characters read
-	char ch; // character that we will be working with
+	char* result = (char*) calloc(1024, sizeof(char)); 	// to store the result
+	int counter = 0; 									// to keep track of how many characters read
+	char ch; 											// character that we will be working with
+	char m_ch; 											// mask character that we will be working with
+	char r_ch;											// character that results from XOR'ing the string
+														//	and mask characters
+	int maskSize = strlen(mask); 						// to loop through the mask
+	int i; 												// used in the for loop
 	
 	// main algorithm to modify the input
 	while(counter < strlen(buf))
 	{
+		for(i=0; i<maskSize; ++i)
+		{
+			// check if all characters from buffer have been XOR'ed
+			if(counter > strlen(buf) - 1)
+				break; // terminate early if you run out of characters
 			
-		for(i=bk-blocks; i<bk; ++i)
-		{
-			// Parse the string to extract characters into blocks
-			if(counter >= strlen(buf))
-			{
-				break;
-			}
-			ch = get_char_from_str(buf, i); // get character in the ith position
-			strncat(group, &ch, 1); // add to group string
-			++counter; // update the counter when another character grabbed
-		}
-		
-		// twist the block of characters
-		for(i=(strlen(group)-1); i>=0; --i)
-		{
-			ch = get_char_from_str(group, i); // get character in the ith position
-			strncat(mod_group, &ch, 1); // add to modified group string
-		}
-		
-		// ready to store the twisted block in the final result
-		strcat(result, mod_group);
-		strcpy(group, ""); // reset the group string to take in next block
-		strcpy(mod_group, ""); // reset the string to take in next block
-		bk += blocks; // increment bk variable
-		
-		
-	}
+			// to loop through the characters in the mask
+			ch = get_char_from_str(buf, counter); 		// get a character from the input string
+			m_ch = get_char_from_str(mask, i);			// get a character from the mask string
+			r_ch = ch ^ m_ch;							// XOR the characters
+			strncat(result, &r_ch, 1); 					// store in result string
+			++counter;									// update the counter after grabbing char from buffer
+		} // end for
+	} // end while
 	
-	strcat(result, "\n"); // add a terminating character to result to keep in line
-						  // with the other programs when passing
-		
 ////////////////////////////////////////////////////////////////////////
 ////////////////// Output result to desired location ///////////////////
 ////////////////////////////////////////////////////////////////////////
-	
+
 	// check output source flag
 	if(out_src == FILESRC)
 	{
@@ -242,8 +245,6 @@ int main(int argc, char *argv[])
 	
 	// free the calloc'ed memory used in the program
 	free(buf);
-	free(group);
-	free(mod_group);
-	free(result);
+	free(result);	
 	return 0;
 }
